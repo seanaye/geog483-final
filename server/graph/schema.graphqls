@@ -1,0 +1,28 @@
+# GraphQL schema example
+#
+# https://gqlgen.com/getting-started/
+
+type Query {
+  _: String
+}
+
+type Coords {
+  x: Float!
+  y: Float!
+}
+
+type User {
+  name: String!
+  radius: Int!
+  coords: Coords
+}
+
+type Session {
+  token: String!
+  user: User!
+}
+
+type Mutation {
+  createSession(name: String!): Session!
+  changeRadius(token: String! radius: Int!): Boolean!
+}
