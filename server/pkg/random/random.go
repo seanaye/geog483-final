@@ -21,5 +21,5 @@ func stringWithCharset(length int, charset string) string {
 }
 
 func RandString(length int) string {
-  return StringWithCharset(length, charset)
+  return stringWithCharset(length, charset)
 }
