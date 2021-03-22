@@ -19,5 +19,5 @@ type SessionItem struct {
 }
 
 type Session interface {
-	Create(name string, x float64, y float64) model.Session
+	Create(name string, x float64, y float64) (model.Session, error)
 }

@@ -17,48 +17,47 @@ type RedisService struct {
 
 func (t *RedisService) Create(name string, x float64, y float64) (*user.SessionItem, error) {
 	client := t.getConnection()
-	id := ranom.RandString(8)
+	id := random.RandString(8)
 	token, err := jwt.CreateToken(id, name)
 	if err != nil {
 		return nil, err
 	}
 
-	err := client.Set(ctx, fmt.Sprintf("%s_name", id), name, 0).Err()
-	if err != nil {
-		return nil, err
+	nameErr := client.Set(ctx, fmt.Sprintf("%s_name", id), name, 0).Err()
+	if nameErr != nil {
+		return nil, nameErr
 	}
-	err := client.Set(ctx, fmt.Sprintf("%s_X", id) x, 0).Err()
-	if err != nil {
-		return nil, err
+	xErr := client.Set(ctx, fmt.Sprintf("%s_X", id), x, 0).Err()
+	if xErr != nil {
+		return nil, xErr
 	}
 
-	err := client.Set(ctx, fmt.Sprintf("%s_Y", id), y, 0).Err()
+	yErr := client.Set(ctx, fmt.Sprintf("%s_Y", id), y, 0).Err()
 	if err != nil {
-		return nil, err
+		return nil, yErr
 	}
 
 	defaultRadius := 1000
-	err := client.Set(ctx, fmt.Sprintf("%s_radius", id), defaultRadius, 0).Err()
-	if err != nil {
-		return nil, err
+	radiusErr := client.Set(ctx, fmt.Sprintf("%s_radius", id), defaultRadius, 0).Err()
+	if radiusErr != nil {
+		return nil, radiusErr
 	}
 
-	user := user.User{
-		name: name,
-		coords: user.coords{
-			X: x,
-			Y: y
-		},
-		radius: defaultRadius
-	}
 	return &user.SessionItem{
-		token: token,
-		user: user
+		Token: token,
+		User: user.User{
+			Name: name,
+			Coords: user.Coords{
+				X: x,
+				Y: y,
+			},
+			Radius: defaultRadius,
+		},
 	}, nil
 }
 
 func (t *RedisService) getConnection() *redis.Client {
 	return redis.NewClient(&redis.Options{
-		Addr: t.Host
+		Addr: t.Host,
 	})
 }

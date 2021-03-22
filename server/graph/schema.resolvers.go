@@ -9,11 +9,10 @@ import (
 
 	"github.com/seanaye/geog483-final/server/graph/generated"
 	"github.com/seanaye/geog483-final/server/graph/model"
-	"github.com/seanaye/geog483-final/server/pkg/redis"
 )
 
 func (r *mutationResolver) CreateSession(ctx context.Context, input model.SessionInput) (*model.Session, error) {
-	session, err := r.Session.Create(input.name, input.x, input.y)
+	session, err := r.Session.Create(input.Name, input.X, input.Y)
 
 	return &model.Session{
 		Token: session.Token,
@@ -22,9 +21,9 @@ func (r *mutationResolver) CreateSession(ctx context.Context, input model.Sessio
 			Radius: session.User.Radius,
 			Coords: model.Coords{
 				X: session.User.Coords.X,
-				Y: session.User.Coords.Y
-			}
-		}
+				Y: session.User.Coords.Y,
+			},
+		},
 	}
 }
 
