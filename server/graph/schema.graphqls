@@ -3,7 +3,7 @@
 # https://gqlgen.com/getting-started/
 
 type Query {
-  _: String
+  users: String
 }
 
 type Coords {
@@ -22,7 +22,13 @@ type Session {
   user: User!
 }
 
+input SessionInput {
+  name: String!
+  x: Float!
+  y: Float!
+}
+
 type Mutation {
-  createSession(name: String!): Session!
+  createSession(input: SessionInput!): Session!
   changeRadius(token: String! radius: Int!): Boolean!
 }

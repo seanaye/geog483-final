@@ -29,9 +29,9 @@ func main() {
 		redis_addr = default_redis
 	}
 
-	userService := &redis.UserService{Addr: redis_addr}
+	service := &redis.RedisService{Addr: redis_addr}
 
-	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{User: userService}}))
+	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{Session: service}}))
 
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	http.Handle("/query", srv)

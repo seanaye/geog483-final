@@ -9,17 +9,30 @@ import (
 
 	"github.com/seanaye/geog483-final/server/graph/generated"
 	"github.com/seanaye/geog483-final/server/graph/model"
+	"github.com/seanaye/geog483-final/server/pkg/redis"
 )
 
-func (r *mutationResolver) CreateSession(ctx context.Context, name string) (*model.Session, error) {
-	panic(fmt.Errorf("not implemented"))
+func (r *mutationResolver) CreateSession(ctx context.Context, input model.SessionInput) (*model.Session, error) {
+	session, err := r.Session.Create(input.name, input.x, input.y)
+
+	return &model.Session{
+		Token: session.Token,
+		User: model.User{
+			Name: session.User.Name,
+			Radius: session.User.Radius,
+			Coords: model.Coords{
+				X: session.User.Coords.X,
+				Y: session.User.Coords.Y
+			}
+		}
+	}
 }
 
 func (r *mutationResolver) ChangeRadius(ctx context.Context, token string, radius int) (bool, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 
-func (r *queryResolver) _(ctx context.Context) (*string, error) {
+func (r *queryResolver) Users(ctx context.Context) (*string, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 
@@ -31,3 +44,13 @@ func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+func (r *queryResolver) _(ctx context.Context) (*string, error) {
+	panic(fmt.Errorf("not implemented"))
+}

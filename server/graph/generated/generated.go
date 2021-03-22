@@ -49,11 +49,11 @@ type ComplexityRoot struct {
 
 	Mutation struct {
 		ChangeRadius  func(childComplexity int, token string, radius int) int
-		CreateSession func(childComplexity int, name string) int
+		CreateSession func(childComplexity int, input model.SessionInput) int
 	}
 
 	Query struct {
-		_ func(childComplexity int) int
+		Users func(childComplexity int) int
 	}
 
 	Session struct {
@@ -69,11 +69,11 @@ type ComplexityRoot struct {
 }
 
 type MutationResolver interface {
-	CreateSession(ctx context.Context, name string) (*model.Session, error)
+	CreateSession(ctx context.Context, input model.SessionInput) (*model.Session, error)
 	ChangeRadius(ctx context.Context, token string, radius int) (bool, error)
 }
 type QueryResolver interface {
-	_(ctx context.Context) (*string, error)
+	Users(ctx context.Context) (*string, error)
 }
 
 type executableSchema struct {
@@ -127,14 +127,14 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateSession(childComplexity, args["name"].(string)), true
+		return e.complexity.Mutation.CreateSession(childComplexity, args["input"].(model.SessionInput)), true
 
-	case "Query._":
-		if e.complexity.Query._ == nil {
+	case "Query.users":
+		if e.complexity.Query.Users == nil {
 			break
 		}
 
-		return e.complexity.Query._(childComplexity), true
+		return e.complexity.Query.Users(childComplexity), true
 
 	case "Session.token":
 		if e.complexity.Session.Token == nil {
@@ -240,7 +240,7 @@ var sources = []*ast.Source{
 # https://gqlgen.com/getting-started/
 
 type Query {
-  _: String
+  users: String
 }
 
 type Coords {
@@ -259,8 +259,14 @@ type Session {
   user: User!
 }
 
+input SessionInput {
+  name: String!
+  x: Float!
+  y: Float!
+}
+
 type Mutation {
-  createSession(name: String!): Session!
+  createSession(input: SessionInput!): Session!
   changeRadius(token: String! radius: Int!): Boolean!
 }
 `, BuiltIn: false},
@@ -298,15 +304,15 @@ func (ec *executionContext) field_Mutation_changeRadius_args(ctx context.Context
 func (ec *executionContext) field_Mutation_createSession_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["name"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
-		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+	var arg0 model.SessionInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNSessionInput2githubᚗcomᚋseanayeᚋgeog483ᚑfinalᚋserverᚋgraphᚋmodelᚐSessionInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["name"] = arg0
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -458,7 +464,7 @@ func (ec *executionContext) _Mutation_createSession(ctx context.Context, field g
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().CreateSession(rctx, args["name"].(string))
+		return ec.resolvers.Mutation().CreateSession(rctx, args["input"].(model.SessionInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -517,7 +523,7 @@ func (ec *executionContext) _Mutation_changeRadius(ctx context.Context, field gr
 	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Query__(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Query_users(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -535,7 +541,7 @@ func (ec *executionContext) _Query__(ctx context.Context, field graphql.Collecte
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query()._(rctx)
+		return ec.resolvers.Query().Users(rctx)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1879,6 +1885,42 @@ func (ec *executionContext) ___Type_ofType(ctx context.Context, field graphql.Co
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputSessionInput(ctx context.Context, obj interface{}) (model.SessionInput, error) {
+	var it model.SessionInput
+	var asMap = obj.(map[string]interface{})
+
+	for k, v := range asMap {
+		switch k {
+		case "name":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			it.Name, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "x":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("x"))
+			it.X, err = ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "y":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("y"))
+			it.Y, err = ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
@@ -1970,7 +2012,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Query")
-		case "_":
+		case "users":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
 				defer func() {
@@ -1978,7 +2020,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query__(ctx, field)
+				res = ec._Query_users(ctx, field)
 				return res
 			})
 		case "__type":
@@ -2364,6 +2406,11 @@ func (ec *executionContext) marshalNSession2ᚖgithubᚗcomᚋseanayeᚋgeog483�
 		return graphql.Null
 	}
 	return ec._Session(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNSessionInput2githubᚗcomᚋseanayeᚋgeog483ᚑfinalᚋserverᚋgraphᚋmodelᚐSessionInput(ctx context.Context, v interface{}) (model.SessionInput, error) {
+	res, err := ec.unmarshalInputSessionInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v interface{}) (string, error) {

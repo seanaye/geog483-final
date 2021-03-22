@@ -12,6 +12,12 @@ type Session struct {
 	User  *User  `json:"user"`
 }
 
+type SessionInput struct {
+	Name string  `json:"name"`
+	X    float64 `json:"x"`
+	Y    float64 `json:"y"`
+}
+
 type User struct {
 	Name   string  `json:"name"`
 	Radius int     `json:"radius"`

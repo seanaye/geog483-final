@@ -6,5 +6,5 @@ package graph
 import "github.com/seanaye/geog483-final/server/pkg/user"
 
 type Resolver struct{
-	User user.User
+	Session user.Session
 }
