@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
-	"github.com/seanaye/grog483-final/server/pkg/random"
+	"github.com/seanaye/geog483-final/server/pkg/random"
 	"github.com/seanaye/geog483-final/server/pkg/jwt"
 	"github.com/seanaye/geog483-final/server/pkg/user"
 )
