@@ -4,7 +4,7 @@ import (
 	"os"
 	"time"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/seanaye/geog483-final/server/random"
+	"github.com/seanaye/geog483-final/server/pkg/random"
 )
 
 
