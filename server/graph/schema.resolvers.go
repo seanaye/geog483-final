@@ -14,17 +14,21 @@ import (
 func (r *mutationResolver) CreateSession(ctx context.Context, input model.SessionInput) (*model.Session, error) {
 	session, err := r.Session.Create(input.Name, input.X, input.Y)
 
+	if err != nil {
+		return nil, err
+	}
+
 	return &model.Session{
 		Token: session.Token,
-		User: model.User{
+		User: &model.User{
 			Name: session.User.Name,
 			Radius: session.User.Radius,
-			Coords: model.Coords{
+			Coords: &model.Coords{
 				X: session.User.Coords.X,
 				Y: session.User.Coords.Y,
 			},
 		},
-	}
+	}, nil
 }
 
 func (r *mutationResolver) ChangeRadius(ctx context.Context, token string, radius int) (bool, error) {

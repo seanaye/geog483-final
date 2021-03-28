@@ -1,8 +1,12 @@
 package jwt
 
 import (
+	"fmt"
+	"net/http"
 	"os"
 	"time"
+	"errors"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/seanaye/geog483-final/server/pkg/random"
 )
@@ -10,6 +14,7 @@ import (
 
 func init() {
 	secret := random.RandString(24)
+	fmt.Print("Starting server with secret ", secret, "\n")
 	os.Setenv("JWT_ACCESS", secret)
 }
 
@@ -23,5 +28,22 @@ func CreateToken(id string, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return token, nil
+}
+
+func ValidateToken(str string) (*jwt.Token error) {
+	claims := &jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(str, claims, func(token *jwt.Token) (interface{} error) {
+		return jwtKey, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !token.valid {
+		return nil, errors.New("Token is invalid")
+	}
+
 	return token, nil
 }

@@ -4,19 +4,21 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"context"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/seanaye/geog483-final/server/graph"
 	"github.com/seanaye/geog483-final/server/graph/generated"
+	"github.com/seanaye/geog483-final/server/pkg/redis"
+
+	"github.com/go-chi/chi"
 )
 
 const defaultPort = "8080"
 const default_redis = "127.0.0.1:6379"
 
 var ctx = context.Background()
-
-
 
 func main() {
 	port := os.Getenv("PORT")
@@ -29,7 +31,9 @@ func main() {
 		redis_addr = default_redis
 	}
 
-	service := &redis.RedisService{Addr: redis_addr}
+	service := &redis.RedisService{Host: redis_addr}
+
+	router := chi.NewRouter()
 
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{Session: service}}))
 
