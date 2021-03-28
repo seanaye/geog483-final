@@ -33,9 +33,9 @@ func CreateToken(id string, name string) (string, error) {
 
 func ValidateToken(str string) (*jwt.Token error) {
 	claims := &jwt.MapClaims{}
-	token, err := jwt.ParseWithClaims(str, claims, func(token *jwt.Token) (interface{} error) {
-		return jwtKey, nil
-	}
+	token, err := jwt.ParseWithClaims(str, claims, func(jwt *jwt.Token) (interface{} error) {
+		return jwt, nil
+	})
 
 	if err != nil {
 		return nil, err
