@@ -1,46 +1,42 @@
-## SvelteKit (vite) with Tailwind
+# create-svelte
 
-## now version 0.0.2
+Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/master/packages/create-svelte);
 
-This boilerplate is fresh init from `svelte@next` at the time of writing, the versions I get are as follows
+## Creating a project
 
-```
-@sveltejs/kit 1.0.0.next-49
-@sveltejs/adapter-static 1.0.0.next-3
-```
-
-## Demo
-
-![Sveltekit with Tailwind](screenshot.png)
-
-Go to [**Live Demo**](https://sveltekit-tailwind2.netlify.app/)
-
-## Running the project
-
-Clone this repo and cd to the directory, then run npm or yarn
+If you're seeing this, you've probably already done this step. Congrats!
 
 ```bash
-npx degit dansvel/sveltekit-typescript-postcss-tailwind2 myproject
-cd myproject
-pnpm install ## or npm or yarn
-pnpm run dev
+# create a new project in the current directory
+npm init svelte@next
+
+# create a new project in my-app
+npm init svelte@next my-app
 ```
 
-Open up your favorite browser, go to localhost:3000 and try clicking around.
+> Note: the `@next` is temporary
 
-Or you can play with the code, just check `src/routes/index.svelte` and try to edit the CSS.
+## Developing
 
-## build and generate static web
+Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
 
 ```bash
-pnpm run build
+npm run dev
+
+# or start the server and open the app in a new browser tab
+npm run dev -- --open
 ```
 
-with the command above, now you can generate static web, you can deploy the project in netlify, begin, vercel or else
+## Building
 
-## Documentation
- - dev.to post [here](https://dev.to/dansvel/sveltekit-svelte-next-with-tailwind-2-4dnn) are outdate.
- - please read the [official documentation](https://github.com/sveltejs/kit/tree/master/documentation)
-## Credits
+Svelte apps are built with _adapters_, which optimise your project for deployment to different environments.
 
-- [svelte-local-storage-store](https://github.com/joshnuss/svelte-local-storage-store) by Joshua Nussbaum
+By default, `npm run build` will generate a Node app that you can run with `node build`. To use a different adapter, add it to the `devDependencies` in `package.json` making sure to specify the version as `next` and update your `svelte.config.cjs` to [specify your chosen adapter](https://kit.svelte.dev/docs#configuration-adapter). The following official adapters are available:
+
+- [@sveltejs/adapter-node](https://github.com/sveltejs/kit/tree/master/packages/adapter-node)
+- [@sveltejs/adapter-static](https://github.com/sveltejs/kit/tree/master/packages/adapter-static)
+- [@sveltejs/adapter-netlify](https://github.com/sveltejs/kit/tree/master/packages/adapter-netlify)
+- [@sveltejs/adapter-vercel](https://github.com/sveltejs/kit/tree/master/packages/adapter-vercel)
+- ...more soon
+
+[See the adapter documentation for more detail](https://kit.svelte.dev/docs#adapters)

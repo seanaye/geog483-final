@@ -1,7 +1,7 @@
 <script lang="ts">
-	let count: number = 0;
+	let count = 0;
 
-	const increment = () => {
+	const increment = (): void => {
 		count += 1;
 	};
 </script>
@@ -10,25 +10,27 @@
 	Clicks: {count}
 </button>
 
-<style>
+<style style lang="postcss">
 	button {
 		font-family: inherit;
 		font-size: inherit;
-		padding: 1em 2em;
-		color: #ff3e00;
-		background-color: rgba(255, 62, 0, 0.1);
-		border-radius: 2em;
-		border: 2px solid rgba(255, 62, 0, 0);
-		outline: none;
-		width: 200px;
+		/* Using Tailwind classes directly on your HTML elements is recommended over @apply. */
+		@apply py-4 px-8;
+		@apply text-red-500;
+		@apply bg-red-500 bg-opacity-10;
+		@apply rounded-full;
+		@apply border-opacity-100;
+		@apply outline-none;
+		@apply w-48;
+		height: 60px;
 		font-variant-numeric: tabular-nums;
 	}
 
-	button:focus {
-		border: 2px solid #ff3e00;
+	button:hover {
+		border: 3px solid #ff3e00;
 	}
 
 	button:active {
-		background-color: rgba(255, 62, 0, 0.2);
+		@apply bg-red-500 bg-opacity-20;
 	}
 </style>
