@@ -5,19 +5,22 @@ type Coords struct {
 	Y float64
 }
 
-type User struct {
+type UserItem struct {
 	Id string
 	Radius int
 	Name string
 	Coords Coords
 }
 
-type SessionItem struct {
-	Token string
-	User User
+type User interface {
+	UpdateUserRadius(id string, radius int) (*UserItem, error)
+	UpdateUserName(id string, name string) (*UserItem, error)
+	CreateUser(name string, radius int, x float64, y float64) (*UserItem, error)
+	DeleteUser(id string) error
+	GetUser(id string) (*UserItem, error)
+	GetUsers(ids ...string) ([]*UserItem, error)
+	GetAllUsers() ([]*UserItem, error)
+	ListenUsers() (chan *UserItem, error)
 }
 
-type Session interface {
-	Create(name string, x float64, y float64) (*SessionItem, error)
-}
 

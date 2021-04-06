@@ -6,8 +6,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
@@ -36,9 +39,11 @@ type Config struct {
 type ResolverRoot interface {
 	Mutation() MutationResolver
 	Query() QueryResolver
+	Subscription() SubscriptionResolver
 }
 
 type DirectiveRoot struct {
+	Auth func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
 }
 
 type ComplexityRoot struct {
@@ -48,8 +53,10 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		ChangeRadius  func(childComplexity int, token string, radius int) int
+		Connect       func(childComplexity int, id string) int
 		CreateSession func(childComplexity int, input model.SessionInput) int
+		UpdateName    func(childComplexity int, name string) int
+		UpdateRadius  func(childComplexity int, radius int) int
 	}
 
 	Query struct {
@@ -61,8 +68,13 @@ type ComplexityRoot struct {
 		User  func(childComplexity int) int
 	}
 
+	Subscription struct {
+		NewUsers func(childComplexity int) int
+	}
+
 	User struct {
 		Coords func(childComplexity int) int
+		ID     func(childComplexity int) int
 		Name   func(childComplexity int) int
 		Radius func(childComplexity int) int
 	}
@@ -70,10 +82,15 @@ type ComplexityRoot struct {
 
 type MutationResolver interface {
 	CreateSession(ctx context.Context, input model.SessionInput) (*model.Session, error)
-	ChangeRadius(ctx context.Context, token string, radius int) (bool, error)
+	UpdateRadius(ctx context.Context, radius int) (*model.User, error)
+	UpdateName(ctx context.Context, name string) (*model.User, error)
+	Connect(ctx context.Context, id string) (bool, error)
 }
 type QueryResolver interface {
-	Users(ctx context.Context) (*string, error)
+	Users(ctx context.Context) ([]*model.User, error)
+}
+type SubscriptionResolver interface {
+	NewUsers(ctx context.Context) (<-chan *model.User, error)
 }
 
 type executableSchema struct {
@@ -105,17 +122,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Coords.Y(childComplexity), true
 
-	case "Mutation.changeRadius":
-		if e.complexity.Mutation.ChangeRadius == nil {
+	case "Mutation.connect":
+		if e.complexity.Mutation.Connect == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_changeRadius_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_connect_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.ChangeRadius(childComplexity, args["token"].(string), args["radius"].(int)), true
+		return e.complexity.Mutation.Connect(childComplexity, args["id"].(string)), true
 
 	case "Mutation.createSession":
 		if e.complexity.Mutation.CreateSession == nil {
@@ -128,6 +145,30 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.CreateSession(childComplexity, args["input"].(model.SessionInput)), true
+
+	case "Mutation.updateName":
+		if e.complexity.Mutation.UpdateName == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateName_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateName(childComplexity, args["name"].(string)), true
+
+	case "Mutation.updateRadius":
+		if e.complexity.Mutation.UpdateRadius == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateRadius_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateRadius(childComplexity, args["radius"].(int)), true
 
 	case "Query.users":
 		if e.complexity.Query.Users == nil {
@@ -150,12 +191,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Session.User(childComplexity), true
 
+	case "Subscription.newUsers":
+		if e.complexity.Subscription.NewUsers == nil {
+			break
+		}
+
+		return e.complexity.Subscription.NewUsers(childComplexity), true
+
 	case "User.coords":
 		if e.complexity.User.Coords == nil {
 			break
 		}
 
 		return e.complexity.User.Coords(childComplexity), true
+
+	case "User.id":
+		if e.complexity.User.ID == nil {
+			break
+		}
+
+		return e.complexity.User.ID(childComplexity), true
 
 	case "User.name":
 		if e.complexity.User.Name == nil {
@@ -209,6 +264,23 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 				Data: buf.Bytes(),
 			}
 		}
+	case ast.Subscription:
+		next := ec._Subscription(ctx, rc.Operation.SelectionSet)
+
+		var buf bytes.Buffer
+		return func(ctx context.Context) *graphql.Response {
+			buf.Reset()
+			data := next()
+
+			if data == nil {
+				return nil
+			}
+			data.MarshalGQL(&buf)
+
+			return &graphql.Response{
+				Data: buf.Bytes(),
+			}
+		}
 
 	default:
 		return graphql.OneShot(graphql.ErrorResponse(ctx, "unsupported GraphQL operation"))
@@ -240,7 +312,7 @@ var sources = []*ast.Source{
 # https://gqlgen.com/getting-started/
 
 type Query {
-  users: String
+  users: [User]!
 }
 
 type Coords {
@@ -249,6 +321,7 @@ type Coords {
 }
 
 type User {
+  id: ID!
   name: String!
   radius: Int!
   coords: Coords
@@ -267,8 +340,16 @@ input SessionInput {
 
 type Mutation {
   createSession(input: SessionInput!): Session!
-  changeRadius(token: String! radius: Int!): Boolean!
+  updateRadius(radius: Int!): User! @auth
+  updateName(name: String!): User! @auth
+  connect(id: ID!): Boolean! @auth
 }
+
+type Subscription {
+  newUsers: User!
+}
+
+directive @auth on FIELD_DEFINITION
 `, BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
@@ -277,27 +358,18 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 
 // region    ***************************** args.gotpl *****************************
 
-func (ec *executionContext) field_Mutation_changeRadius_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_connect_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
 	var arg0 string
-	if tmp, ok := rawArgs["token"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
-		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["token"] = arg0
-	var arg1 int
-	if tmp, ok := rawArgs["radius"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("radius"))
-		arg1, err = ec.unmarshalNInt2int(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["radius"] = arg1
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -313,6 +385,36 @@ func (ec *executionContext) field_Mutation_createSession_args(ctx context.Contex
 		}
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateName_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["name"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateRadius_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 int
+	if tmp, ok := rawArgs["radius"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("radius"))
+		arg0, err = ec.unmarshalNInt2int(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["radius"] = arg0
 	return args, nil
 }
 
@@ -481,7 +583,7 @@ func (ec *executionContext) _Mutation_createSession(ctx context.Context, field g
 	return ec.marshalNSession2ᚖgithubᚗcomᚋseanayeᚋgeog483ᚑfinalᚋserverᚋgraphᚋmodelᚐSession(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_changeRadius(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_updateRadius(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -498,15 +600,159 @@ func (ec *executionContext) _Mutation_changeRadius(ctx context.Context, field gr
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_changeRadius_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_updateRadius_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().ChangeRadius(rctx, args["token"].(string), args["radius"].(int))
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdateRadius(rctx, args["radius"].(int))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.User); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/seanaye/geog483-final/server/graph/model.User`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.User)
+	fc.Result = res
+	return ec.marshalNUser2ᚖgithubᚗcomᚋseanayeᚋgeog483ᚑfinalᚋserverᚋgraphᚋmodelᚐUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_updateName(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_updateName_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdateName(rctx, args["name"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.User); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/seanaye/geog483-final/server/graph/model.User`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.User)
+	fc.Result = res
+	return ec.marshalNUser2ᚖgithubᚗcomᚋseanayeᚋgeog483ᚑfinalᚋserverᚋgraphᚋmodelᚐUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_connect(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_connect_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().Connect(rctx, args["id"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(bool); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be bool`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -548,11 +794,14 @@ func (ec *executionContext) _Query_users(ctx context.Context, field graphql.Coll
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.([]*model.User)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNUser2ᚕᚖgithubᚗcomᚋseanayeᚋgeog483ᚑfinalᚋserverᚋgraphᚋmodelᚐUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -694,6 +943,86 @@ func (ec *executionContext) _Session_user(ctx context.Context, field graphql.Col
 	res := resTmp.(*model.User)
 	fc.Result = res
 	return ec.marshalNUser2ᚖgithubᚗcomᚋseanayeᚋgeog483ᚑfinalᚋserverᚋgraphᚋmodelᚐUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Subscription_newUsers(ctx context.Context, field graphql.CollectedField) (ret func() graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = nil
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Subscription().NewUsers(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return nil
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return nil
+	}
+	return func() graphql.Marshaler {
+		res, ok := <-resTmp.(<-chan *model.User)
+		if !ok {
+			return nil
+		}
+		return graphql.WriterFunc(func(w io.Writer) {
+			w.Write([]byte{'{'})
+			graphql.MarshalString(field.Alias).MarshalGQL(w)
+			w.Write([]byte{':'})
+			ec.marshalNUser2ᚖgithubᚗcomᚋseanayeᚋgeog483ᚑfinalᚋserverᚋgraphᚋmodelᚐUser(ctx, field.Selections, res).MarshalGQL(w)
+			w.Write([]byte{'}'})
+		})
+	}
+}
+
+func (ec *executionContext) _User_id(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _User_name(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
@@ -1981,8 +2310,18 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "changeRadius":
-			out.Values[i] = ec._Mutation_changeRadius(ctx, field)
+		case "updateRadius":
+			out.Values[i] = ec._Mutation_updateRadius(ctx, field)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "updateName":
+			out.Values[i] = ec._Mutation_updateName(ctx, field)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "connect":
+			out.Values[i] = ec._Mutation_connect(ctx, field)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
@@ -2021,6 +2360,9 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_users(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
 				return res
 			})
 		case "__type":
@@ -2070,6 +2412,26 @@ func (ec *executionContext) _Session(ctx context.Context, sel ast.SelectionSet, 
 	return out
 }
 
+var subscriptionImplementors = []string{"Subscription"}
+
+func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func() graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, subscriptionImplementors)
+	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
+		Object: "Subscription",
+	})
+	if len(fields) != 1 {
+		ec.Errorf(ctx, "must subscribe to exactly one stream")
+		return nil
+	}
+
+	switch fields[0].Name {
+	case "newUsers":
+		return ec._Subscription_newUsers(ctx, fields[0])
+	default:
+		panic("unknown field " + strconv.Quote(fields[0].Name))
+	}
+}
+
 var userImplementors = []string{"User"}
 
 func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj *model.User) graphql.Marshaler {
@@ -2081,6 +2443,11 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("User")
+		case "id":
+			out.Values[i] = ec._User_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "name":
 			out.Values[i] = ec._User_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -2379,6 +2746,21 @@ func (ec *executionContext) marshalNFloat2float64(ctx context.Context, sel ast.S
 	return res
 }
 
+func (ec *executionContext) unmarshalNID2string(ctx context.Context, v interface{}) (string, error) {
+	res, err := graphql.UnmarshalID(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
+	res := graphql.MarshalID(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v interface{}) (int, error) {
 	res, err := graphql.UnmarshalInt(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -2426,6 +2808,47 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNUser2githubᚗcomᚋseanayeᚋgeog483ᚑfinalᚋserverᚋgraphᚋmodelᚐUser(ctx context.Context, sel ast.SelectionSet, v model.User) graphql.Marshaler {
+	return ec._User(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNUser2ᚕᚖgithubᚗcomᚋseanayeᚋgeog483ᚑfinalᚋserverᚋgraphᚋmodelᚐUser(ctx context.Context, sel ast.SelectionSet, v []*model.User) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOUser2ᚖgithubᚗcomᚋseanayeᚋgeog483ᚑfinalᚋserverᚋgraphᚋmodelᚐUser(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+	return ret
 }
 
 func (ec *executionContext) marshalNUser2ᚖgithubᚗcomᚋseanayeᚋgeog483ᚑfinalᚋserverᚋgraphᚋmodelᚐUser(ctx context.Context, sel ast.SelectionSet, v *model.User) graphql.Marshaler {
@@ -2720,6 +3143,13 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 		return graphql.Null
 	}
 	return graphql.MarshalString(*v)
+}
+
+func (ec *executionContext) marshalOUser2ᚖgithubᚗcomᚋseanayeᚋgeog483ᚑfinalᚋserverᚋgraphᚋmodelᚐUser(ctx context.Context, sel ast.SelectionSet, v *model.User) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._User(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {

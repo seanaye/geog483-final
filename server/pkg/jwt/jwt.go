@@ -2,10 +2,9 @@ package jwt
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"time"
-	"errors"
+	"log"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/seanaye/geog483-final/server/pkg/random"
@@ -31,19 +30,23 @@ func CreateToken(id string, name string) (string, error) {
 	return token, nil
 }
 
-func ValidateToken(str string) (*jwt.Token error) {
-	claims := &jwt.MapClaims{}
-	token, err := jwt.ParseWithClaims(str, claims, func(jwt *jwt.Token) (interface{} error) {
-		return jwt, nil
-	})
+func ValidateClaims(tokenStr string) (jwt.MapClaims, bool) {
+		hmacSecretString := os.Getenv("JWT_ACCESS")
+		hmacSecret := []byte(hmacSecretString)
+		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+				 // check token signing method etc
+				 return hmacSecret, nil
+		})
 
-	if err != nil {
-		return nil, err
-	}
+		if err != nil {
+				return nil, false
+		}
 
-	if !token.Valid {
-		return nil, errors.New("Token is invalid")
-	}
-
-	return token, nil
+		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+				return claims, true
+		} else {
+				log.Printf("Invalid JWT Token")
+				return nil, false
+		}
 }
+

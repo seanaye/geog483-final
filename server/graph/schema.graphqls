@@ -3,7 +3,7 @@
 # https://gqlgen.com/getting-started/
 
 type Query {
-  users: String
+  users: [User]!
 }
 
 type Coords {
@@ -12,6 +12,7 @@ type Coords {
 }
 
 type User {
+  id: ID!
   name: String!
   radius: Int!
   coords: Coords
@@ -30,7 +31,13 @@ input SessionInput {
 
 type Mutation {
   createSession(input: SessionInput!): Session!
-  changeRadius(token: String! radius: Int!): Boolean! @auth
+  updateRadius(radius: Int!): User! @auth
+  updateName(name: String!): User! @auth
+  connect(id: ID!): Boolean! @auth
+}
+
+type Subscription {
+  newUsers: User!
 }
 
 directive @auth on FIELD_DEFINITION

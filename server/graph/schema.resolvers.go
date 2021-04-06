@@ -5,38 +5,83 @@ package graph
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/seanaye/geog483-final/server/graph/generated"
 	"github.com/seanaye/geog483-final/server/graph/model"
+	"github.com/seanaye/geog483-final/server/pkg/middleware"
+	"github.com/seanaye/geog483-final/server/pkg/translate"
 )
 
 func (r *mutationResolver) CreateSession(ctx context.Context, input model.SessionInput) (*model.Session, error) {
-	session, err := r.Session.Create(input.Name, input.X, input.Y)
+	session, err := r.Session.CreateSession(input.Name, input.X, input.Y)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &model.Session{
-		Token: session.Token,
-		User: &model.User{
-			Name: session.User.Name,
-			Radius: session.User.Radius,
-			Coords: &model.Coords{
-				X: session.User.Coords.X,
-				Y: session.User.Coords.Y,
-			},
-		},
-	}, nil
+	return translate.MakeSession(session), nil
 }
 
-func (r *mutationResolver) ChangeRadius(ctx context.Context, token string, radius int) (bool, error) {
-	panic(fmt.Errorf("not implemented"))
+func (r *mutationResolver) UpdateRadius(ctx context.Context, radius int) (*model.User, error) {
+	user := middleware.ForContext(ctx)
+
+	updated, err := r.User.UpdateUserRadius(user.Id, radius)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return translate.MakeUser(updated), nil
 }
 
-func (r *queryResolver) Users(ctx context.Context) (*string, error) {
-	panic(fmt.Errorf("not implemented"))
+func (r *mutationResolver) UpdateName(ctx context.Context, name string) (*model.User, error) {
+	user := middleware.ForContext(ctx)
+
+	updated, err := r.User.UpdateUserName(user.Id, name)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return translate.MakeUser(updated), nil
+}
+
+func (r *mutationResolver) Connect(ctx context.Context, id string) (bool, error) {
+	return true, nil
+}
+
+func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
+	users, err := r.User.GetAllUsers()
+
+	if err != nil {
+		return nil, err
+	}
+
+	var output []*model.User
+
+	for _, user := range users {
+		output = append(output, translate.MakeUser(user))
+	}
+
+	return output, nil
+}
+
+func (r *subscriptionResolver) NewUsers(ctx context.Context) (<-chan *model.User, error) {
+	userChan, err := r.User.ListenUsers()
+
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(chan *model.User)
+
+	go func() {
+		for user := range userChan {
+			out <- translate.MakeUser(user)
+		}
+	}()
+
+	return out, nil
 }
 
 // Mutation returns generated.MutationResolver implementation.
@@ -45,15 +90,9 @@ func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResol
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
+// Subscription returns generated.SubscriptionResolver implementation.
+func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subscriptionResolver{r} }
+
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-func (r *queryResolver) _(ctx context.Context) (*string, error) {
-	panic(fmt.Errorf("not implemented"))
-}
+type subscriptionResolver struct{ *Resolver }
