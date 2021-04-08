@@ -1,0 +1,14 @@
+mutation createSession ($name: String!, $x: Float!, $y: Float!) {
+	createSession(input: { name: $name, x: $x, y: $y }) {
+		token
+		user {
+			id
+			name
+			radius
+			coords {
+				x
+				y
+			}
+		}
+	}
+}

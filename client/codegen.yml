@@ -1,0 +1,17 @@
+overwrite: true
+watch: true
+schema:
+  - "http://localhost:8080/query"
+
+documents: src/**/*.graphql
+
+generates:
+  src/lib/types/api.ts:
+    config:
+      withHooks: false
+      urqlImportFrom: "@urql/svelte"
+    plugins:
+      - typescript
+      - typescript-operations
+      - typescript-urql
+
