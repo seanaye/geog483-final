@@ -15,6 +15,7 @@ import (
 	"github.com/seanaye/geog483-final/server/pkg/middleware"
 
 	"github.com/go-chi/chi"
+	"github.com/go-chi/cors"
 )
 
 const defaultPort = "8080"
@@ -37,6 +38,12 @@ func main() {
 	service.Clear()
 
 	router := chi.NewRouter()
+
+	router.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"https://*", "http://*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+    AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+	}))
 	router.Use(middleware.Auth(*service))
 
 	conf := generated.Config{Resolvers: &graph.Resolver{Session: service, User: service}}
