@@ -5,14 +5,19 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/extension"
+	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/gorilla/websocket"
 	"github.com/seanaye/geog483-final/server/graph"
 	"github.com/seanaye/geog483-final/server/graph/generated"
 	"github.com/seanaye/geog483-final/server/pkg/directive"
-	"github.com/seanaye/geog483-final/server/pkg/redis"
 	"github.com/seanaye/geog483-final/server/pkg/middleware"
+	"github.com/seanaye/geog483-final/server/pkg/redis"
+	"github.com/99designs/gqlgen/graphql/handler/lru"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
@@ -34,9 +39,11 @@ func main() {
 		redis_addr = defaultRedis
 	}
 
+	// create database service
 	service := &redis.RedisService{Host: redis_addr}
 	service.Clear()
 
+	// create router and add middleware
 	router := chi.NewRouter()
 
 	router.Use(cors.Handler(cors.Options{
@@ -45,12 +52,40 @@ func main() {
     AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 	}))
 	router.Use(middleware.Auth(*service))
+	//////
 
-	conf := generated.Config{Resolvers: &graph.Resolver{Session: service, User: service}}
+	conf := generated.Config{Resolvers: &graph.Resolver{Session: service, User: service, Message: service}}
 	conf.Directives.Auth = directive.Auth
 
-	srv := handler.NewDefaultServer(generated.NewExecutableSchema(conf))
+	srv := handler.New(generated.NewExecutableSchema(conf))
+	
+	// Configure transport settings
+	srv.AddTransport(transport.Websocket{
+		KeepAlivePingInterval: 10 * time.Second,
+		Upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				return true
+			},
+		},
+		InitFunc: middleware.WSInit(*service),
+	})
+	srv.AddTransport(transport.POST{})
+	srv.AddTransport(transport.Options{})
+	srv.AddTransport(transport.GET{})
+	srv.AddTransport(transport.MultipartForm{})
 
+	srv.SetQueryCache(lru.New(1000))
+
+	srv.Use(extension.Introspection{})
+	srv.Use(extension.AutomaticPersistedQuery{
+		Cache: lru.New(100),
+	})
+
+	srv.Use(extension.Introspection{})
+	//////////
+
+
+	// serve gqlgen app via chi router
 	router.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	router.Handle("/query", srv)
 

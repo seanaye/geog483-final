@@ -1,27 +1,73 @@
 <script lang="ts">
+	import Input from '$lib/component/Input.svelte'
 	import Leaflet from '$lib/component/Leaflet.svelte'
 	import Control from '$lib/component/Control.svelte'
 	import MapToolbar from '$lib/component/MapToolbar.svelte'
-	import Marker from '$lib/component/Marker.svelte'
-	import Popup from '$lib/component/Popup.svelte'
-
+	import UserMarker from '$lib/component/UserMarker.svelte'
+	import { onDestroy, onMount } from 'svelte'
+	import { query, mutation, subscription } from '@urql/svelte'
+	import { users } from '$lib/store/users'
+	import { location } from '$lib/store/location'
+	import {
+		updateCoordsStore,
+		delUsersStore,
+		usersUpdatesStore,
+		endSessionStore,
+		getUsersStore,
+		messagesStore
+} from '$lib/util/urql'
+ 
 	let map;
-
-	const markerLocations = [
-		[29.8283, -96.5795],
-		[37.8283, -90.5795],
-		[43.8283, -102.5795],
-		[48.40, -122.5795],
-		[43.60, -79.5795],
-		[36.8283, -100.5795],
-		[38.40, -122.5795],
-	];
 	
-	
-	const initialView = [39.8283, -98.5795];
+	const initialView = [43.466667, -80.516670];
 	
 	let eye = true;
-	let showLines = true;
+
+	// fetch and add initial users
+	const usersStore = query(getUsersStore)
+	$: {
+		const usersPayload = $usersStore.data?.users
+		if (usersPayload && !$users.length) {
+			users.set(usersPayload)
+		}
+	}
+
+	// subscribe to user updates
+	const usersUpdate = subscription(usersUpdatesStore)
+
+	// when a user update comes from the server,
+	// put it in the users store
+	$: {
+		const usersPayload = $usersUpdate.data?.users
+		console.log({ usersPayload })
+		if (usersPayload) {
+			users.addSingle(usersPayload)
+		}
+	}
+
+	// subscribe to users which are deleted
+	const usersDel = subscription(delUsersStore)
+
+	// when the server tells us a user has left
+	// remove it from the users store
+	$: {
+		const deletedId = $usersDel.data?.delUsers
+		users.remove(deletedId)
+	}
+
+	// send update when our watched location changes
+	const updateLocation = mutation(updateCoordsStore)
+	$: {
+		updateLocation($location);
+		console.log('location mutation');
+	}
+
+	// subscribe to incoming messages
+	const messages = subscription(messagesStore)
+	$: {
+		const subData = $messages.data
+		console.log({ subData })
+	}
 
 	function resizeMap() {
 	  if(map) { map.invalidateSize(); }
@@ -31,6 +77,15 @@
 		map.setView(initialView, 5);
 	}
 
+
+
+	// cleanup the user session
+	const endSession = mutation(endSessionStore)
+	onDestroy(endSession)
+	onMount(() => {
+		window.onbeforeunload = () => endSession()
+	})
+
 </script>
 <svelte:window on:resize={resizeMap} />
 
@@ -39,18 +94,24 @@
    integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
    crossorigin=""/>
 
-<Leaflet bind:map view={initialView} zoom={4}>
+<Leaflet bind:map view={initialView} zoom={12}>
 	<Control position="topright">
-		<MapToolbar bind:eye bind:lines={showLines} on:click-reset={resetMapView} />
+		<MapToolbar  />
 	</Control>
 	
 	{#if eye}
-		{#each markerLocations as latLng}
-			<Marker {latLng} width={30} height={30}>
-				<svg style="width:30px;height:30px" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" stroke="currentColor"><path d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"></path></svg>
-				
-				<Popup>A popup!</Popup>
-			</Marker> 
+		{#each $users as user (user.id) }
+			<UserMarker {user} />
 		{/each}
 	{/if}
+	<Control position="bottomleft">
+		<div class="w-screen -ml-2 -mb-3">
+			<div class="p-4 bg-white flex flex-row items-end w-11-12 mx-auto">
+				<Input label="Message" />
+				<button type="button" class="h-11 mb-2 inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+					Send
+				</button>	
+			</div>
+		</div>
+	</Control>
 </Leaflet>

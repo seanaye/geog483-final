@@ -29,15 +29,30 @@ input SessionInput {
   y: Float!
 }
 
+input CoordsInput {
+  x: Float!
+  y: Float!
+}
+
 type Mutation {
   createSession(input: SessionInput!): Session!
+  endSession: Boolean! @auth
   updateRadius(radius: Int!): User! @auth
   updateName(name: String!): User! @auth
-  connect(id: ID!): Boolean! @auth
+  updateCoords(input: CoordsInput!): User! @auth
+  sendMessage(content: String!): Boolean! @auth
+}
+
+type Message {
+  content: String!
+  time: Int!
+  user: User!
 }
 
 type Subscription {
-  newUsers: User!
+  users: User!
+  delUsers: ID!
+  messages: Message! @auth
 }
 
 directive @auth on FIELD_DEFINITION

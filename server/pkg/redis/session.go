@@ -1,7 +1,7 @@
 package redis
 
 import (
-	"fmt"
+	"context"
 
 	"github.com/seanaye/geog483-final/server/pkg/jwt"
 	"github.com/seanaye/geog483-final/server/pkg/session"
@@ -25,7 +25,7 @@ func (t *RedisService) CreateSession(name string, x float64, y float64) (*sessio
 
 
 	// publish to channel
-	client.Publish(ctx, "clients", fmt.Sprintf("%s_enter", user.Id))
+	client.Publish(ctx, "client_id", user.Id)
 
 	return &session.SessionItem{
 		Token: token,
@@ -37,8 +37,34 @@ func (t *RedisService) EndSession(id string) error {
 	client := t.getConnection()
 	defer client.Close()
 
-	client.Publish(ctx, "clients", fmt.Sprintf("%s_exit", id))
+	client.Publish(ctx, "deleted_id", id)
 
 	return t.DeleteUser(id)
+}
+
+func (t *RedisService) ListenEndedSession() (<-chan string, error, context.CancelFunc) {
+	client := t.getConnection()
+
+	sub := client.Subscribe(ctx, "deleted_id")
+
+	channel := sub.Channel()
+
+	out := make(chan string)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		for {
+			select {
+			case <- ctx.Done():
+				client.Close()
+				return
+			case id := <- channel:
+				out <- id.Payload
+			}
+		}
+	}()
+
+	return out, nil, cancel
 }
 

@@ -1,9 +1,10 @@
 package translate
 
 import (
-	"github.com/seanaye/geog483-final/server/pkg/user"
-	"github.com/seanaye/geog483-final/server/pkg/session"
 	"github.com/seanaye/geog483-final/server/graph/model"
+	"github.com/seanaye/geog483-final/server/pkg/message"
+	"github.com/seanaye/geog483-final/server/pkg/session"
+	"github.com/seanaye/geog483-final/server/pkg/user"
 )
 
 func MakeUser(u *user.UserItem) *model.User {
@@ -21,6 +22,13 @@ func MakeUser(u *user.UserItem) *model.User {
 func MakeSession(s *session.SessionItem) *model.Session {
 	return &model.Session{
 		Token: s.Token,
+		User: MakeUser(&s.User),
+	}
+}
+
+func MakeMessage(s *message.MessageItem) *model.Message {
+	return &model.Message{
+		Content: s.Content,
 		User: MakeUser(&s.User),
 	}
 }

@@ -1,0 +1,13 @@
+mutation UpdateCoords ($x: Float! $y: Float!) {
+	updateCoords(input: {
+		x: $x
+		y: $y
+	}) {
+		id
+		radius
+		coords {
+			x
+			y
+		}
+	}
+}

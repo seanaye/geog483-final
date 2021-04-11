@@ -3,35 +3,55 @@ package middleware
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
+	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/seanaye/geog483-final/server/pkg/jwt"
 	"github.com/seanaye/geog483-final/server/pkg/redis"
 	"github.com/seanaye/geog483-final/server/pkg/user"
 )
-type contextKey struct {
-	name string
-}
-
-var userCtxKey = &contextKey{"user"}
 
 type JSONErrorMessage struct {
 	Message string `json:"message"`
 }
 
+func getAndValidateUser(db redis.RedisService, token string) (*user.UserItem, error) {
+
+	// turn bearer string into token
+	segments := strings.Split(token, " ")
+
+	if segments[0] != "Bearer" {
+		return nil, errors.New("Invalid Token")
+	}
+
+	claims, valid := jwt.ValidateClaims(segments[1])
+
+	if !valid {
+		return nil, errors.New("Invalid Token")
+	}
+
+	id := claims["id"].(string)
+	user, err := db.GetUser(id)
+	if err != nil {
+		return nil, errors.New("Could not find user")
+	}
+
+	return user, nil
+}
+
 func JSONError(w http.ResponseWriter, err interface{}, code int) {
-    w.Header().Set("Content-Type", "application/json; charset=utf-8")
-    w.Header().Set("X-Content-Type-Options", "nosniff")
-    w.WriteHeader(code)
-    json.NewEncoder(w).Encode(err)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(err)
 }
 
 func Auth(db redis.RedisService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			c := r.Header.Get("Authorization")
-			
 
 			// allow unauthenticated users
 			if c == "" {
@@ -39,29 +59,13 @@ func Auth(db redis.RedisService) func(http.Handler) http.Handler {
 				return
 			}
 
-			// turn bearer string into token
-			segments := strings.Split(c, " ")
+			user, err := getAndValidateUser(db, c)
 
-			if segments[0] != "bearer" {
-				JSONError(w, JSONErrorMessage{"Invalid token"}, http.StatusForbidden)
-				return
-			}
-
-			claims, valid := jwt.ValidateClaims(segments[1])
-
-			if !valid {
-				JSONError(w, JSONErrorMessage{"Invalid authentication token"}, http.StatusForbidden)
-				return
-			}
-
-			id := claims["id"].(string)
-			user, err := db.GetUser(id)
 			if err != nil {
-				JSONError(w, JSONErrorMessage{"Could not find user in database"}, http.StatusNotFound)
-				return
+				JSONError(w, JSONErrorMessage{"Invalid authentication token"}, http.StatusForbidden)
 			}
 
-			ctx := context.WithValue(r.Context(), userCtxKey, user)
+			ctx := context.WithValue(r.Context(), "user", user)
 
 			r = r.WithContext(ctx)
 			next.ServeHTTP(w, r)
@@ -70,7 +74,22 @@ func Auth(db redis.RedisService) func(http.Handler) http.Handler {
 	}
 }
 
+func WSInit(service redis.RedisService) func(context.Context, transport.InitPayload) (context.Context, error) {
+	return func(ctx context.Context, initPayload transport.InitPayload) (context.Context, error) {
+		user, err := getAndValidateUser(service, initPayload.GetString("Authorization"))
+		if err != nil {
+			return nil, err
+		}
+
+		// put it in context
+		userCtx := context.WithValue(ctx, "user", user)
+
+		// and return it so the resolvers can see it
+		return userCtx, nil
+	}
+}
+
 func ForContext(ctx context.Context) *user.UserItem {
-	raw, _ := ctx.Value(userCtxKey).(*user.UserItem)
+	raw, _ := ctx.Value("user").(*user.UserItem)
 	return raw
 }

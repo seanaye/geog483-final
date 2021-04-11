@@ -7,6 +7,17 @@ type Coords struct {
 	Y float64 `json:"y"`
 }
 
+type CoordsInput struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+type Message struct {
+	Content string `json:"content"`
+	Time    int    `json:"time"`
+	User    *User  `json:"user"`
+}
+
 type Session struct {
 	Token string `json:"token"`
 	User  *User  `json:"user"`

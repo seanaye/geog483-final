@@ -20,12 +20,26 @@ export type Coords = {
   y: Scalars['Float'];
 };
 
+export type CoordsInput = {
+  x: Scalars['Float'];
+  y: Scalars['Float'];
+};
+
+export type Message = {
+  __typename?: 'Message';
+  content: Scalars['String'];
+  time: Scalars['Int'];
+  user: User;
+};
+
 export type Mutation = {
   __typename?: 'Mutation';
   createSession: Session;
+  endSession: Scalars['Boolean'];
   updateRadius: User;
   updateName: User;
-  connect: Scalars['Boolean'];
+  updateCoords: User;
+  sendMessage: Scalars['Boolean'];
 };
 
 
@@ -44,8 +58,13 @@ export type MutationUpdateNameArgs = {
 };
 
 
-export type MutationConnectArgs = {
-  id: Scalars['ID'];
+export type MutationUpdateCoordsArgs = {
+  input: CoordsInput;
+};
+
+
+export type MutationSendMessageArgs = {
+  content: Scalars['String'];
 };
 
 export type Query = {
@@ -67,7 +86,9 @@ export type SessionInput = {
 
 export type Subscription = {
   __typename?: 'Subscription';
-  newUsers: User;
+  users: User;
+  delUsers: Scalars['ID'];
+  messages: Message;
 };
 
 export type User = {
@@ -101,6 +122,112 @@ export type CreateSessionMutation = (
   ) }
 );
 
+export type DelUsersSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type DelUsersSubscription = (
+  { __typename?: 'Subscription' }
+  & Pick<Subscription, 'delUsers'>
+);
+
+export type EndSessionMutationVariables = Exact<{ [key: string]: never; }>;
+
+
+export type EndSessionMutation = (
+  { __typename?: 'Mutation' }
+  & Pick<Mutation, 'endSession'>
+);
+
+export type GetUsersQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetUsersQuery = (
+  { __typename?: 'Query' }
+  & { users: Array<Maybe<(
+    { __typename?: 'User' }
+    & Pick<User, 'id' | 'name' | 'radius'>
+    & { coords?: Maybe<(
+      { __typename?: 'Coords' }
+      & Pick<Coords, 'x' | 'y'>
+    )> }
+  )>> }
+);
+
+export type SendMessageMutationVariables = Exact<{
+  content: Scalars['String'];
+}>;
+
+
+export type SendMessageMutation = (
+  { __typename?: 'Mutation' }
+  & Pick<Mutation, 'sendMessage'>
+);
+
+export type SubMessagesSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SubMessagesSubscription = (
+  { __typename?: 'Subscription' }
+  & { messages: (
+    { __typename?: 'Message' }
+    & Pick<Message, 'content'>
+    & { user: (
+      { __typename?: 'User' }
+      & Pick<User, 'name'>
+    ) }
+  ) }
+);
+
+export type SubUsersSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SubUsersSubscription = (
+  { __typename?: 'Subscription' }
+  & { users: (
+    { __typename?: 'User' }
+    & Pick<User, 'id' | 'name' | 'radius'>
+    & { coords?: Maybe<(
+      { __typename?: 'Coords' }
+      & Pick<Coords, 'x' | 'y'>
+    )> }
+  ) }
+);
+
+export type UpdateCoordsMutationVariables = Exact<{
+  x: Scalars['Float'];
+  y: Scalars['Float'];
+}>;
+
+
+export type UpdateCoordsMutation = (
+  { __typename?: 'Mutation' }
+  & { updateCoords: (
+    { __typename?: 'User' }
+    & Pick<User, 'id' | 'radius'>
+    & { coords?: Maybe<(
+      { __typename?: 'Coords' }
+      & Pick<Coords, 'x' | 'y'>
+    )> }
+  ) }
+);
+
+export type UpdateRadiusMutationVariables = Exact<{
+  rad: Scalars['Int'];
+}>;
+
+
+export type UpdateRadiusMutation = (
+  { __typename?: 'Mutation' }
+  & { updateRadius: (
+    { __typename?: 'User' }
+    & Pick<User, 'id' | 'radius'>
+    & { coords?: Maybe<(
+      { __typename?: 'Coords' }
+      & Pick<Coords, 'x' | 'y'>
+    )> }
+  ) }
+);
+
 
 export const CreateSessionDocument = gql`
     mutation createSession($name: String!, $x: Float!, $y: Float!) {
@@ -114,6 +241,81 @@ export const CreateSessionDocument = gql`
         x
         y
       }
+    }
+  }
+}
+    `;
+export const DelUsersDocument = gql`
+    subscription delUsers {
+  delUsers
+}
+    `;
+export const EndSessionDocument = gql`
+    mutation endSession {
+  endSession
+}
+    `;
+export const GetUsersDocument = gql`
+    query getUsers {
+  users {
+    id
+    name
+    radius
+    coords {
+      x
+      y
+    }
+  }
+}
+    `;
+export const SendMessageDocument = gql`
+    mutation sendMessage($content: String!) {
+  sendMessage(content: $content)
+}
+    `;
+export const SubMessagesDocument = gql`
+    subscription subMessages {
+  messages {
+    content
+    user {
+      name
+    }
+  }
+}
+    `;
+export const SubUsersDocument = gql`
+    subscription subUsers {
+  users {
+    id
+    name
+    radius
+    coords {
+      x
+      y
+    }
+  }
+}
+    `;
+export const UpdateCoordsDocument = gql`
+    mutation UpdateCoords($x: Float!, $y: Float!) {
+  updateCoords(input: {x: $x, y: $y}) {
+    id
+    radius
+    coords {
+      x
+      y
+    }
+  }
+}
+    `;
+export const UpdateRadiusDocument = gql`
+    mutation UpdateRadius($rad: Int!) {
+  updateRadius(radius: $rad) {
+    id
+    radius
+    coords {
+      x
+      y
     }
   }
 }

@@ -1,0 +1,11 @@
+query getUsers {
+	users {
+		id
+		name
+		radius
+		coords {
+			x
+			y
+		}
+	}
+}

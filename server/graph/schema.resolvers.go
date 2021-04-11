@@ -5,6 +5,7 @@ package graph
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/seanaye/geog483-final/server/graph/generated"
 	"github.com/seanaye/geog483-final/server/graph/model"
@@ -20,6 +21,17 @@ func (r *mutationResolver) CreateSession(ctx context.Context, input model.Sessio
 	}
 
 	return translate.MakeSession(session), nil
+}
+
+func (r *mutationResolver) EndSession(ctx context.Context) (bool, error) {
+	user := middleware.ForContext(ctx)
+
+	err := r.Session.EndSession(user.Id)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 func (r *mutationResolver) UpdateRadius(ctx context.Context, radius int) (*model.User, error) {
@@ -46,8 +58,24 @@ func (r *mutationResolver) UpdateName(ctx context.Context, name string) (*model.
 	return translate.MakeUser(updated), nil
 }
 
-func (r *mutationResolver) Connect(ctx context.Context, id string) (bool, error) {
-	return true, nil
+func (r *mutationResolver) UpdateCoords(ctx context.Context, input model.CoordsInput) (*model.User, error) {
+	user := middleware.ForContext(ctx)
+
+	updated, err := r.User.UpdateUserLocation(user, input.X, input.Y)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return translate.MakeUser(updated), nil
+}
+
+func (r *mutationResolver) SendMessage(ctx context.Context, content string) (bool, error) {
+	user := middleware.ForContext(ctx)
+
+	res, err := r.Message.CreateMessage(user, content)
+
+	return res, err
 }
 
 func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
@@ -66,8 +94,8 @@ func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
 	return output, nil
 }
 
-func (r *subscriptionResolver) NewUsers(ctx context.Context) (<-chan *model.User, error) {
-	userChan, err := r.User.ListenUsers()
+func (r *subscriptionResolver) Users(ctx context.Context) (<-chan *model.User, error) {
+	userChan, err, cancel := r.User.ListenUsers()
 
 	if err != nil {
 		return nil, err
@@ -76,8 +104,49 @@ func (r *subscriptionResolver) NewUsers(ctx context.Context) (<-chan *model.User
 	out := make(chan *model.User)
 
 	go func() {
-		for user := range userChan {
-			out <- translate.MakeUser(user)
+		for {
+			select {
+			case <-ctx.Done():
+				cancel()
+			case out <- translate.MakeUser(<-userChan):
+			}
+		}
+	}()
+
+	return out, nil
+}
+
+func (r *subscriptionResolver) DelUsers(ctx context.Context) (<-chan string, error) {
+	channel, err, cancel := r.Session.ListenEndedSession()
+
+	go func() {
+		<-ctx.Done()
+		cancel()
+	}()
+
+	return channel, err
+}
+
+func (r *subscriptionResolver) Messages(ctx context.Context) (<-chan *model.Message, error) {
+	fmt.Printf("got ctx: %+v", ctx)
+	user := middleware.ForContext(ctx)
+	fmt.Printf("got user: %+v", user)
+
+	msgChan, err, cancel := r.Message.ListenMessages(user)
+
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(chan *model.Message)
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				cancel()
+			case out <- translate.MakeMessage(<-msgChan):
+			}
 		}
 	}()
 

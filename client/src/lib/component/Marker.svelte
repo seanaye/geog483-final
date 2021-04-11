@@ -9,8 +9,8 @@
 
 	export let width = 30;
 	export let height = 30;
-	export let latLng;
- 
+	export let lat = 0
+	export let lng = 0
 	const layerGroup = getContext('layerGroup')();
 	setContext('layer', () => marker);
 
@@ -21,13 +21,17 @@
 		}
 	})
 
+	$: if (marker) {
+		marker.setLatLng([lat, lng]).update()
+	}
+
   function createMarker(markerElement) {
 		let icon = L.divIcon({ 
 			html: markerElement, 
 			className: 'map-marker',
 			iconSize: L.point(width, height)
 		});
-		marker = L.marker(latLng, { icon }).addTo(layerGroup);
+		marker = L.marker([lat, lng], { icon }).addTo(layerGroup);
 
     return {
       destroy() {
@@ -41,7 +45,7 @@
 </script>
 
 <div class="hidden">
-	{#if L}
+	{#if L && lat && lng}
 		<div use:createMarker class={classNames}>
 			{#if marker}
 				<slot />

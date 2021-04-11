@@ -1,0 +1,11 @@
+subscription subUsers {
+	users {
+		id
+		name
+		radius
+		coords {
+			x
+			y
+		}
+	}
+}

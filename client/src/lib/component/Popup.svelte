@@ -17,7 +17,7 @@
   
 	function createPopup(popupElement) {
     popup = L.popup().setContent(popupElement);
-    layer.bindPopup(popup);
+      layer.bindPopup(popup, {maxWidth: 250});
     layer.on('popupopen', () => {
       popupOpen = true;
       showContents = true;

@@ -1,0 +1,10 @@
+mutation UpdateRadius ($rad: Int!) {
+	updateRadius(radius: $rad) {
+		id
+		radius
+		coords {
+			x
+			y
+		}
+	}
+}

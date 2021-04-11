@@ -1,13 +1,14 @@
 package redis
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
-	"errors"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/seanaye/geog483-final/server/pkg/user"
 	"github.com/seanaye/geog483-final/server/pkg/random"
+	"github.com/seanaye/geog483-final/server/pkg/user"
 )
 
 func (t *RedisService) CreateUser(name string, radius int, x float64, y float64) (*user.UserItem, error) {
@@ -71,21 +72,26 @@ func (t *RedisService) DeleteUser(id string) error {
 
 func (t *RedisService) UpdateUserRadius(id string, radius int) (*user.UserItem, error) {
 	client := t.getConnection()
-	defer client.Close()
 
 	radiusErr := client.Set(ctx, fmt.Sprintf("%s_radius", id), radius, 0).Err()
 	if radiusErr != nil {
 		return nil, radiusErr
 	}
 
+	fmt.Println("pub to redis")
+	client.Publish(ctx, "client_id", id)
+
 	return t.GetUser(id)
 }
+
 
 func (t *RedisService) UpdateUserName(id string, name string) (*user.UserItem, error) {
 	client := t.getConnection()
 	defer client.Close()
 
 	nameErr := client.Set(ctx, fmt.Sprintf("%s_name", id), name, 0).Err()
+
+	client.Publish(ctx, "client_id", id)
 
 	if nameErr != nil {
 		return nil, nameErr
@@ -94,25 +100,24 @@ func (t *RedisService) UpdateUserName(id string, name string) (*user.UserItem, e
 	return t.GetUser(id)
 }
 
-func (t *RedisService) UpdateUserLocation(id string, x float64, y float64) (*user.UserItem, error) {
+func (t *RedisService) UpdateUserLocation(u *user.UserItem, x float64, y float64) (*user.UserItem, error) {
 	client := t.getConnection()
 	defer client.Close()
 
-	location_name := fmt.Sprintf("%s_loc", id)
 	loc := &redis.GeoLocation{
-		Name: location_name,
+		Name: fmt.Sprintf("%s_loc", u.Id),
 		Longitude: x,
 		Latitude: y,
 	}
 
-	client.Publish(ctx, "clients", fmt.Sprintf("%s_update", id))
-
-	locErr := client.GeoAdd(ctx, location_name, loc).Err()
+	locRes, locErr := client.GeoAdd(ctx, "user_locations", loc).Result()
 	if locErr != nil {
 		return nil, locErr
 	}
+	log.Printf("geoadd: %d", locRes)
 
-	return t.GetUser(id)
+	client.Publish(ctx, "client_id", u.Id)
+	return t.GetUser(u.Id)
 }
 
 
@@ -127,7 +132,6 @@ func (t *RedisService) GetUser(id string) (*user.UserItem, error) {
 }
 
 func (t *RedisService) GetUsers(ids ...string) ([]*user.UserItem, error) {
-	log.Printf("getting users: %s", ids)
 	client := t.getConnection()
 	defer client.Close()
 
@@ -151,7 +155,6 @@ func (t *RedisService) GetUsers(ids ...string) ([]*user.UserItem, error) {
 
 	var output []*user.UserItem
 
-	log.Printf("pos cmds: %s", posCmds)
 	for i, id := range ids {
 		pos := posCmds[i].Val()
 		radius, radiusErr := radiusCmds[i].Int()
@@ -191,26 +194,32 @@ func (t *RedisService) GetAllUsers() ([]*user.UserItem, error) {
 }
 
 
-func (t *RedisService) mapChanUser(sub <-chan *redis.Message, userChan chan<- *user.UserItem, client *redis.Client) {
-	for message := range sub {
-		user, _ := t.GetUser(message.String())
-		if user != nil {
-			userChan <- user
-		}
-	}
-	defer client.Close()
-}
-
-func (t *RedisService) ListenUsers() (chan *user.UserItem, error) {
+func (t *RedisService) ListenUsers() (chan *user.UserItem, error, context.CancelFunc) {
 	client := t.getConnection()
 
-	sub := client.Subscribe(ctx, "clients")
+	sub := client.Subscribe(ctx, "client_id")
 	channel := sub.Channel()
 
 	out := make(chan *user.UserItem)
 
-	go t.mapChanUser(channel, out, client)
+	ctx, cancel := context.WithCancel(context.Background())
 
-	return out, nil
+	go func () {
+		for {
+			select {
+			case <-ctx.Done():
+				client.Close()
+				return
+			case m := <- channel:
+				s := m.Payload
+				user, _ := t.GetUser(s)
+				if user != nil {
+					out <- user
+				}
+			}
+		}
+	}()
+
+	return out, nil, cancel
 }
 
