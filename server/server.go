@@ -10,6 +10,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
+	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/gorilla/websocket"
 	"github.com/seanaye/geog483-final/server/graph"
 	"github.com/seanaye/geog483-final/server/graph/generated"
@@ -40,11 +41,10 @@ func main() {
 	router := chi.NewRouter()
 
 	router.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{"*"},
-		AllowedHeaders: []string{"*"},
+		AllowedOrigins: []string{"https://*", "http://*"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
-		MaxAge: 300,
 	}))
 	router.Use(middleware.Auth(*service))
 	//////
@@ -80,6 +80,7 @@ func main() {
 	//////////
 
 	// serve gqlgen app via chi router
+	router.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	router.Handle("/query", srv)
 
 	err := http.ListenAndServe("0.0.0.0:8080", router)
