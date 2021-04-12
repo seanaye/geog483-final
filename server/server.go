@@ -40,9 +40,11 @@ func main() {
 	router := chi.NewRouter()
 
 	router.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"https://*", "http://*"},
+		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"*"},
 		AllowedHeaders: []string{"*"},
+		AllowCredentials: true,
+		MaxAge: 300,
 	}))
 	router.Use(middleware.Auth(*service))
 	//////
