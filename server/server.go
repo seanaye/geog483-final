@@ -79,7 +79,6 @@ func main() {
 	//////////
 
 	// serve gqlgen app via chi router
-	router.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	router.Handle("/query", srv)
 
 	err := http.ListenAndServe("0.0.0.0:8080", router)
