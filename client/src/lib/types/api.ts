@@ -163,6 +163,15 @@ export type SendMessageMutation = (
   & Pick<Mutation, 'sendMessage'>
 );
 
+export type MsgFragment = (
+  { __typename?: 'Message' }
+  & Pick<Message, 'time' | 'content'>
+  & { user: (
+    { __typename?: 'User' }
+    & Pick<User, 'name'>
+  ) }
+);
+
 export type SubMessagesSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -170,11 +179,7 @@ export type SubMessagesSubscription = (
   { __typename?: 'Subscription' }
   & { messages: (
     { __typename?: 'Message' }
-    & Pick<Message, 'content'>
-    & { user: (
-      { __typename?: 'User' }
-      & Pick<User, 'name'>
-    ) }
+    & MsgFragment
   ) }
 );
 
@@ -228,7 +233,15 @@ export type UpdateRadiusMutation = (
   ) }
 );
 
-
+export const MsgFragmentDoc = gql`
+    fragment msg on Message {
+  time
+  content
+  user {
+    name
+  }
+}
+    `;
 export const CreateSessionDocument = gql`
     mutation createSession($name: String!, $x: Float!, $y: Float!) {
   createSession(input: {name: $name, x: $x, y: $y}) {
@@ -276,13 +289,10 @@ export const SendMessageDocument = gql`
 export const SubMessagesDocument = gql`
     subscription subMessages {
   messages {
-    content
-    user {
-      name
-    }
+    ...msg
   }
 }
-    `;
+    ${MsgFragmentDoc}`;
 export const SubUsersDocument = gql`
     subscription subUsers {
   users {

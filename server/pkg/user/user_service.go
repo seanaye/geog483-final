@@ -1,6 +1,8 @@
 package user
 
-import "context"
+import (
+	"github.com/go-redis/redis/v8"
+)
 
 type Coords struct {
 	X float64
@@ -23,7 +25,7 @@ type User interface {
 	GetUser(id string) (*UserItem, error)
 	GetUsers(ids ...string) ([]*UserItem, error)
 	GetAllUsers() ([]*UserItem, error)
-	ListenUsers() (chan *UserItem, error, context.CancelFunc)
+	ListenUsers() (chan *UserItem, *redis.PubSub)
 }
 
 

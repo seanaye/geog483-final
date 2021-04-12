@@ -7,7 +7,8 @@ import {
 	SubUsersDocument,
 	EndSessionDocument,
 	GetUsersDocument,
-	SubMessagesDocument
+	SubMessagesDocument,
+	SendMessageDocument
 } from '$lib/types/api';
 
 import type {
@@ -26,7 +27,9 @@ import type {
 	GetUsersQuery,
 	GetUsersQueryVariables,
 	SubMessagesSubscription,
-	SubMessagesSubscriptionVariables
+	SubMessagesSubscriptionVariables,
+	SendMessageMutation,
+	SendMessageMutationVariables
 } from '$lib/types/api';
 
 export const sessionStore = operationStore<CreateSessionMutation, CreateSessionMutationVariables>(
@@ -63,3 +66,8 @@ export const messagesStore = operationStore<
 	SubMessagesSubscription,
 	SubMessagesSubscriptionVariables
 >(SubMessagesDocument);
+
+export const sendMessageStore = operationStore<
+	SendMessageMutation,
+	SendMessageMutationVariables
+>(SendMessageDocument)

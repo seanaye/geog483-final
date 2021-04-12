@@ -30,6 +30,9 @@ module.exports = {
 			},
 			ssr: {
 				noExternal: Object.keys(pkg.dependencies || {})
+			},
+			server: {
+				host: '127.0.0.1'
 			}
 		}
 	}

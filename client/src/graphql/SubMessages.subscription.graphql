@@ -1,8 +1,13 @@
-subscription subMessages {
-	messages {
+fragment msg on Message {
+		time
 		content
 		user {
 			name
 		}
+}
+
+subscription subMessages {
+	messages {
+		...msg
 	}
 }

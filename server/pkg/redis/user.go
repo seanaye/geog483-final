@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -194,7 +193,7 @@ func (t *RedisService) GetAllUsers() ([]*user.UserItem, error) {
 }
 
 
-func (t *RedisService) ListenUsers() (chan *user.UserItem, error, context.CancelFunc) {
+func (t *RedisService) ListenUsers() (chan *user.UserItem, *redis.PubSub) {
 	client := t.getConnection()
 
 	sub := client.Subscribe(ctx, "client_id")
@@ -202,24 +201,17 @@ func (t *RedisService) ListenUsers() (chan *user.UserItem, error, context.Cancel
 
 	out := make(chan *user.UserItem)
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	go func () {
-		for {
-			select {
-			case <-ctx.Done():
-				client.Close()
-				return
-			case m := <- channel:
-				s := m.Payload
-				user, _ := t.GetUser(s)
-				if user != nil {
-					out <- user
-				}
+		for m := range channel {
+			s := m.Payload
+			user, _ := t.GetUser(s)
+			if user != nil {
+				out <- user
 			}
 		}
+		defer client.Close()
 	}()
 
-	return out, nil, cancel
+	return out, sub
 }
 

@@ -2,7 +2,7 @@
   // minimum slider value in meters
   export let min = 1000
   // maximum slider value in meters
-  export let max = 100000
+  export let max = 10000
   // starting value of slider in meters
   export let value = 2000
 

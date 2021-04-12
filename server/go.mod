@@ -9,4 +9,5 @@ require (
 	github.com/go-chi/cors v1.2.0 // indirect
 	github.com/go-redis/redis/v8 v8.7.1
 	github.com/vektah/gqlparser/v2 v2.1.0
+	github.com/gorilla/websocket v1.4.2
 )

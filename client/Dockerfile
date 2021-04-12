@@ -17,6 +17,11 @@ RUN npm run build
 
 # end build step
 
-FROM caddy:latest as 
+FROM caddy:latest
 
+WORKDIR /usr/share/caddy
+
+COPY --from=build /usr/src/app/build .
+
+CMD ["caddy"]
 

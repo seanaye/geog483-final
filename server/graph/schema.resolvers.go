@@ -5,7 +5,7 @@ package graph
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/seanaye/geog483-final/server/graph/generated"
 	"github.com/seanaye/geog483-final/server/graph/model"
@@ -95,59 +95,42 @@ func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
 }
 
 func (r *subscriptionResolver) Users(ctx context.Context) (<-chan *model.User, error) {
-	userChan, err, cancel := r.User.ListenUsers()
-
-	if err != nil {
-		return nil, err
-	}
+	userChan, sub := r.User.ListenUsers()
 
 	out := make(chan *model.User)
 
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				cancel()
-			case out <- translate.MakeUser(<-userChan):
-			}
+		for msg := range(userChan) {
+			out <- translate.MakeUser(msg)
 		}
+		defer sub.Close()
 	}()
 
 	return out, nil
 }
 
 func (r *subscriptionResolver) DelUsers(ctx context.Context) (<-chan string, error) {
-	channel, err, cancel := r.Session.ListenEndedSession()
+	channel, _ := r.Session.ListenEndedSession()
 
-	go func() {
-		<-ctx.Done()
-		cancel()
-	}()
-
-	return channel, err
+	return channel, nil
 }
 
 func (r *subscriptionResolver) Messages(ctx context.Context) (<-chan *model.Message, error) {
-	fmt.Printf("got ctx: %+v", ctx)
 	user := middleware.ForContext(ctx)
-	fmt.Printf("got user: %+v", user)
 
-	msgChan, err, cancel := r.Message.ListenMessages(user)
-
-	if err != nil {
-		return nil, err
+	if user == nil {
+		return nil, errors.New("Invalid Token")
 	}
+
+	msgChan, sub := r.Message.ListenMessages(user)
 
 	out := make(chan *model.Message)
 
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				cancel()
-			case out <- translate.MakeMessage(<-msgChan):
-			}
+		for msg := range(msgChan) {
+			out <- translate.MakeMessage(msg)
 		}
+		defer sub.Close()
 	}()
 
 	return out, nil

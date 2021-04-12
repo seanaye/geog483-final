@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -22,6 +21,7 @@ func (t *RedisService) CreateMessage(user *user.UserItem, message string) (bool,
 
 	req := redis.GeoRadiusQuery{
 		Radius: float64(user.Radius),
+		Unit: "m",
 	}
 
 	res, err := client.GeoRadius(ctx, "user_locations", user.Coords.X, user.Coords.Y, &req).Result()
@@ -32,6 +32,7 @@ func (t *RedisService) CreateMessage(user *user.UserItem, message string) (bool,
 
 	// publish to available channels
 	for _, loc := range res {
+		fmt.Printf("loc: %+v\n", loc)
 		id := strings.Replace(loc.Name, "_loc", "", -1)
 		//publish to the users own receive channel
 		m := msg{
@@ -51,7 +52,7 @@ func (t *RedisService) CreateMessage(user *user.UserItem, message string) (bool,
 }
 
 
-func (t *RedisService) ListenMessages(user *user.UserItem) (<-chan *message.MessageItem, error, context.CancelFunc) {
+func (t *RedisService) ListenMessages(user *user.UserItem) (<-chan *message.MessageItem, *redis.PubSub) {
 	client := t.getConnection()
 
 	sub := client.Subscribe(ctx, fmt.Sprintf("%s_rcv_msg", user.Id))
@@ -60,21 +61,14 @@ func (t *RedisService) ListenMessages(user *user.UserItem) (<-chan *message.Mess
 
 	out := make(chan *message.MessageItem)
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				client.Close()
-				return
-			case msg := <- channel:
-				var item message.MessageItem
-				json.Unmarshal([]byte(msg.Payload), &item)
-				out <- &item
-			}
+		for msg := range channel {
+			var item message.MessageItem
+			json.Unmarshal([]byte(msg.Payload), &item)
+			out <- &item
 		}
+		defer client.Close()
 	}()
 
-	return out, nil, cancel
+	return out, sub
 }

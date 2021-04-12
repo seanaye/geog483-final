@@ -9,6 +9,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
+	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/gorilla/websocket"
@@ -17,7 +18,6 @@ import (
 	"github.com/seanaye/geog483-final/server/pkg/directive"
 	"github.com/seanaye/geog483-final/server/pkg/middleware"
 	"github.com/seanaye/geog483-final/server/pkg/redis"
-	"github.com/99designs/gqlgen/graphql/handler/lru"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
@@ -48,8 +48,8 @@ func main() {
 
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"https://*", "http://*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-    AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 	}))
 	router.Use(middleware.Auth(*service))
 	//////
@@ -58,7 +58,7 @@ func main() {
 	conf.Directives.Auth = directive.Auth
 
 	srv := handler.New(generated.NewExecutableSchema(conf))
-	
+
 	// Configure transport settings
 	srv.AddTransport(transport.Websocket{
 		KeepAlivePingInterval: 10 * time.Second,
@@ -83,7 +83,6 @@ func main() {
 
 	srv.Use(extension.Introspection{})
 	//////////
-
 
 	// serve gqlgen app via chi router
 	router.Handle("/", playground.Handler("GraphQL playground", "/query"))

@@ -1,8 +1,7 @@
 package redis
 
 import (
-	"context"
-
+	"github.com/go-redis/redis/v8"
 	"github.com/seanaye/geog483-final/server/pkg/jwt"
 	"github.com/seanaye/geog483-final/server/pkg/session"
 )
@@ -42,7 +41,7 @@ func (t *RedisService) EndSession(id string) error {
 	return t.DeleteUser(id)
 }
 
-func (t *RedisService) ListenEndedSession() (<-chan string, error, context.CancelFunc) {
+func (t *RedisService) ListenEndedSession() (<-chan string, *redis.PubSub) {
 	client := t.getConnection()
 
 	sub := client.Subscribe(ctx, "deleted_id")
@@ -51,20 +50,15 @@ func (t *RedisService) ListenEndedSession() (<-chan string, error, context.Cance
 
 	out := make(chan string)
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	go func() {
-		for {
-			select {
-			case <- ctx.Done():
-				client.Close()
-				return
-			case id := <- channel:
-				out <- id.Payload
-			}
+		for id := range channel{
+			out <- id.Payload
 		}
+		defer func () {
+			client.Close()
+		}()
 	}()
 
-	return out, nil, cancel
+	return out, sub
 }
 

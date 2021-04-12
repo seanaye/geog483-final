@@ -1,8 +1,7 @@
 package message
 
 import (
-	"context"
-
+	"github.com/go-redis/redis/v8"
 	"github.com/seanaye/geog483-final/server/pkg/user"
 )
 
@@ -12,6 +11,6 @@ type MessageItem struct {
 }
 
 type Message interface {
-	ListenMessages(user *user.UserItem) (<-chan *MessageItem, error, context.CancelFunc)
+	ListenMessages(user *user.UserItem) (<-chan *MessageItem, *redis.PubSub)
 	CreateMessage(user *user.UserItem, message string) (bool, error)
 }

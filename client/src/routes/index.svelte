@@ -4,17 +4,20 @@
 	import Control from '$lib/component/Control.svelte'
 	import MapToolbar from '$lib/component/MapToolbar.svelte'
 	import UserMarker from '$lib/component/UserMarker.svelte'
+	import UserMessages from '$lib/component/UserMessages.svelte'
 	import { onDestroy, onMount } from 'svelte'
 	import { query, mutation, subscription } from '@urql/svelte'
 	import { users } from '$lib/store/users'
 	import { location } from '$lib/store/location'
+	import { messages } from '$lib/store/message'
 	import {
 		updateCoordsStore,
 		delUsersStore,
 		usersUpdatesStore,
 		endSessionStore,
 		getUsersStore,
-		messagesStore
+		messagesStore,
+		sendMessageStore
 } from '$lib/util/urql'
  
 	let map;
@@ -59,26 +62,32 @@
 	const updateLocation = mutation(updateCoordsStore)
 	$: {
 		updateLocation($location);
-		console.log('location mutation');
 	}
 
 	// subscribe to incoming messages
-	const messages = subscription(messagesStore)
+	const messagesSub = subscription(messagesStore)
 	$: {
-		const subData = $messages.data
-		console.log({ subData })
+		const subData = $messagesSub.data?.messages
+		if (subData) messages.append(subData)
 	}
+
+
+	// hold value of message input
+	let msg = ''
+	const sendMsgMut = mutation(sendMessageStore)
+
+	async function sendMsg () {
+		if (msg) {
+			await sendMsgMut({ content: msg })
+			msg = ''
+		}
+	}
+
 
 	function resizeMap() {
 	  if(map) { map.invalidateSize(); }
   }
 	
-	function resetMapView() {
-		map.setView(initialView, 5);
-	}
-
-
-
 	// cleanup the user session
 	const endSession = mutation(endSessionStore)
 	onDestroy(endSession)
@@ -94,24 +103,33 @@
    integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
    crossorigin=""/>
 
-<Leaflet bind:map view={initialView} zoom={12}>
-	<Control position="topright">
-		<MapToolbar  />
-	</Control>
-	
-	{#if eye}
-		{#each $users as user (user.id) }
-			<UserMarker {user} />
-		{/each}
-	{/if}
-	<Control position="bottomleft">
-		<div class="w-screen -ml-2 -mb-3">
-			<div class="p-4 bg-white flex flex-row items-end w-11-12 mx-auto">
-				<Input label="Message" />
-				<button type="button" class="h-11 mb-2 inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-					Send
-				</button>	
-			</div>
+<div class="absolute top-0 bottom-0 left-0 right-0 grid grid-rows-6 grid-cols-1">
+	<div class="row-span-4 col-span-6">
+		<Leaflet bind:map view={initialView} zoom={12}>
+			<Control position="topright">
+				<MapToolbar  />
+			</Control>
+			
+			{#if eye}
+				{#each $users as user (user.id) }
+					<UserMarker {user} />
+				{/each}
+			{/if}
+		</Leaflet>
+	</div>
+	<div class="grid grid-cols-6 grid-rows-4 w-full row-span-2">
+		<div class="col-span-6 p-3 row-span-3 overflow-y-auto h-full">
+			<UserMessages />
 		</div>
-	</Control>
-</Leaflet>
+		<div class="col-span-4 md:col-span-5 self-end ml-2">
+			<Input label="Message" bind:value={msg} />
+		</div>
+		<button
+			type="button"
+			on:click={sendMsg}
+			class="col-span-2 md:col-span-1 self-end mb-2 mx-2 h-11 text-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+		>
+			Send
+		</button>	
+	</div>
+</div>

@@ -1,6 +1,7 @@
 package translate
 
 import (
+	"time"
 	"github.com/seanaye/geog483-final/server/graph/model"
 	"github.com/seanaye/geog483-final/server/pkg/message"
 	"github.com/seanaye/geog483-final/server/pkg/session"
@@ -28,6 +29,7 @@ func MakeSession(s *session.SessionItem) *model.Session {
 
 func MakeMessage(s *message.MessageItem) *model.Message {
 	return &model.Message{
+		Time: int(time.Now().Unix()),
 		Content: s.Content,
 		User: MakeUser(&s.User),
 	}

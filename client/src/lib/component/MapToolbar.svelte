@@ -6,7 +6,7 @@
 
 	const mut = mutation(radiusStore)
 
-	let value = 500
+	let value = 2000
 
 	let timer: NodeJS.Timeout;
 	function debounceMut () {

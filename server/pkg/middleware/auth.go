@@ -76,7 +76,26 @@ func Auth(db redis.RedisService) func(http.Handler) http.Handler {
 
 func WSInit(service redis.RedisService) func(context.Context, transport.InitPayload) (context.Context, error) {
 	return func(ctx context.Context, initPayload transport.InitPayload) (context.Context, error) {
-		user, err := getAndValidateUser(service, initPayload.GetString("Authorization"))
+		if initPayload == nil {
+			return ctx, nil
+		}
+
+		var gg map[string]interface{}
+		gg = initPayload
+		headers := gg["headers"]
+		if headers == nil {
+			return ctx, nil
+		}
+		token := headers.(map[string]interface{})["Authorization"]
+		//header := initPayload["headers"]["Authorization"]
+		if token == nil {
+			return ctx, nil
+		}
+
+		if token == "" {
+			return ctx, nil
+		}
+		user, err := getAndValidateUser(service, token.(string))
 		if err != nil {
 			return nil, err
 		}
