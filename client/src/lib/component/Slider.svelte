@@ -3,8 +3,8 @@
   export let min = 1000
   // maximum slider value in meters
   export let max = 10000
-  // starting value of slider in meters
-  export let value = 2000
+
+  export let value:number
 
   function formatMeters (m: number) {
     if (m < 1000) return `${m} m`

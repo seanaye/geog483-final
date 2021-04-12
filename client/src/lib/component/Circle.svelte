@@ -33,7 +33,6 @@
       fillOpacity: 0.5,
       radius
     }).addTo(layerGroup)
-    console.log({ circle })
     return {
       destroy () {
         if (circle) {

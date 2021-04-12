@@ -12,7 +12,7 @@ export const location = readable<{x: number; y: number;}>({x: 0, y: 0}, function
       x: pos.coords.longitude,
       y: pos.coords.latitude
     }
-    console.log({ crd })
+    console.log( crd )
     set(crd)
   }
 
