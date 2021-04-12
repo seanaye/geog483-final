@@ -17,4 +17,5 @@ services:
       - caddy:/data
       - .Caddyfile:/etc/caddy/Caddyfile
 
-
+volumes:
+  caddy:
