@@ -10,7 +10,6 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
-	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/gorilla/websocket"
 	"github.com/seanaye/geog483-final/server/graph"
 	"github.com/seanaye/geog483-final/server/graph/generated"
