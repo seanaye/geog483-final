@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -23,16 +22,11 @@ import (
 	"github.com/go-chi/cors"
 )
 
-const defaultPort = "8080"
 const defaultRedis = "redis:6379"
 
 var ctx = context.Background()
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = defaultPort
-	}
 
 	redis_addr := os.Getenv("REDIS_HOST")
 	if redis_addr == "" {
@@ -88,8 +82,7 @@ func main() {
 	router.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	router.Handle("/query", srv)
 
-	log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)
-	err := http.ListenAndServe(":8080", router)
+	err := http.ListenAndServe("0.0.0.0:8080", router)
 	if err != nil {
 		panic(err)
 	}
