@@ -41,8 +41,8 @@ func main() {
 
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"https://*", "http://*"},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedMethods: []string{"*"},
+		AllowedHeaders: []string{"*"},
 	}))
 	router.Use(middleware.Auth(*service))
 	//////
