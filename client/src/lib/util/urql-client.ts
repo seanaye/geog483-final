@@ -12,7 +12,7 @@ import { sessionStore } from './urql';
 import ws from 'ws';
 import { SubscriptionClient } from 'subscriptions-transport-ws';
 
-const uri = 'localhost:8080/query';
+const uri = 'geomsg.seanaye.ca/query';
 
 const makeHeader = () => {
 	const token = sessionStore.data?.createSession?.token;
@@ -23,7 +23,7 @@ const makeHeader = () => {
 
 const makeSubClient = () =>
 	new SubscriptionClient(
-		`ws://${uri}`,
+		`wss://${uri}`,
 		{
 			reconnect: true,
 			connectionParams: makeHeader
@@ -34,7 +34,7 @@ const makeSubClient = () =>
 let subClient;
 
 export const client = createClient({
-	url: `http://${uri}`,
+	url: `https://${uri}`,
 	fetchOptions: makeHeader,
 	exchanges: [
 		dedupExchange,

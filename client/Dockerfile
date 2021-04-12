@@ -13,15 +13,5 @@ RUN npm install
 # Bundle app source
 COPY . .
 
-RUN npm run build
-
-# end build step
-
-FROM caddy:latest
-
-WORKDIR /usr/share/caddy
-
-COPY --from=build /usr/src/app/build .
-
-CMD ["caddy"]
+CMD ["npm", "run", "dev"]
 
