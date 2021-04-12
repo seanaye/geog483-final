@@ -1,8 +1,5 @@
 geomsg.seanaye.ca {
-  route /query/* {
-    reverse_proxy server:8080
-  }
   route /* {
-    reverse_proxy client:3000
+    reverse_proxy server:8080
   }
 }
