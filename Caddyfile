@@ -1,0 +1,5 @@
+geomsg.seanaye.ca {
+  route /* {
+    reverse_proxy server:3000
+  }
+}

@@ -24,7 +24,7 @@ import (
 )
 
 const defaultPort = "8080"
-const defaultRedis = "127.0.0.1:6379"
+const defaultRedis = "redis:6379"
 
 var ctx = context.Background()
 
